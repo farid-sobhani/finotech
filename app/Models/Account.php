@@ -13,8 +13,5 @@ class Account extends Model
 
     protected $guarded = [];
 
-    public static function findAccountById($id)
-    {
-    return Account::query()->find($id);
-    }
+
 }

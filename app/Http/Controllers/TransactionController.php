@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Http\Services\TransactionService;
+use App\Interfaces\TransactionRepositoryInterface;
 use App\Models\User;
+use Facade\FlareClient\Time\Time;
 use http\Env\Response;
 use Illuminate\Http\Request;
 use App\Http\Requests\TransactionRequest;
@@ -14,38 +16,45 @@ use Laravel\Passport\Passport;
 
 class TransactionController extends Controller
 {
+    private $repo;
+
+    public function __construct(TransactionRepositoryInterface $transactionRepository)
+    {
+        $this->repo = $transactionRepository;
+    }
+
     public function transfer(TransactionRequest $transaction)
     {
-        $client = Transaction::add($transaction);
+        $client = $this->repo->add($transaction);
         $user = Auth::user()->account;
-        $res = Http::withHeaders([
-            'Content-Type' => 'application/json',
-            'Authorization' => Transaction::findAccountByDeposit($transaction->destination_account_number)->token,
-        ])
-            ->withHeaders([
-                'amount' => $transaction->amount,
-                'description' => $transaction->description,
-                'destinationFirstname' => $client->destination_first_name,
-                'destinationLastname' => $client->destination_last_name,
-                'destinationNumber' => $client->destination_account_number,
-                'paymentNumber' => $client->payment_number,
-                'deposit' => $user->deposit,
-                'sourceFirstName' => $user->firstname,
-                'sourceLastName' => $user->lastname,
-            ])
-            ->post('https://sandboxapi.finnotech.ir/oak/v2/clients/' . $user->user_id
-                . '/transferTo?trackId=' . $client->track_id);
+        $bank = $this->repo->findAccountByDeposit($transaction->destination_account_number)->bankName;
+        $authorization = $this->repo->findAccountByDeposit($transaction->destination_account_number)->token;
+
+        switch ($bank) {
+            case "parsian":
+                $res = TransactionService::transferToParsian($transaction, $client, $user, $authorization);
+                break;
+            case "keshavarzi":
+                $res = TransactionService::transferToKeshavarzi($transaction, $client, $user, $authorization);
+
+                break;
+            case "ayande":
+                $res = TransactionService::transferToAyande($transaction, $client, $user, $authorization);
+
+                break;
+        }
+
         if ($res->serverError()) {
             return \response()->json(['error' => 'Server error'], 500);
         }
         if ($res->status() == 400) {
-            $res = Transaction::updateUnsuccessful($client->id, $res->object());
-            return \response()->json([$res],400);
+            $res = $this->repo->updateUnSuccessful($client->id, $res->object());
+            return \response()->json([$res], 400);
 
         }
         if ($res->status() == 200) {
-            $res = Transaction::updateSuccessful($client->id, $res->object());
-            return \response()->json([$res],200);
+            $res = $this->repo->updateSuccessful($client->id, $res->object());
+            return \response()->json([$res], 200);
         }
 
 
@@ -53,7 +62,7 @@ class TransactionController extends Controller
 
     public function transactions()
     {
-        $transactions = Transaction::transactions(Auth::id());
+        $transactions = $this->repo->transactions(Auth::id());
         return response()->json($transactions, 200);
     }
 

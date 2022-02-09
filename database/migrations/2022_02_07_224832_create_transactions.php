@@ -16,6 +16,10 @@ class CreateTransactions extends Migration
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
             $table->string('amount');
+            $table->string('firstname');
+            $table->string('lastname');
+            $table->string('deposit');
+            $table->string('phone');
             $table->string('second_password');
             $table->string('description', 30);
             $table->string('destination_first_name');
@@ -33,7 +37,7 @@ class CreateTransactions extends Migration
             $table->timestamps();
             $table->foreignId('user_id')
                 ->references('id')->on('users')
-                ->onDelete('cascade');
+                ->onDelete('SetNull');
         });
     }
 

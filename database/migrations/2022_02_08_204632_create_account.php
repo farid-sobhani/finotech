@@ -19,8 +19,9 @@ class CreateAccount extends Migration
             $table->string('firstname');
             $table->string('lastname');
             $table->string('deposit')->unique();
-            $table->string('secondPassword');
+            $table->string('second_password');
             $table->string('phone');
+            $table->enum('bankName',['parsian','keshavarzi','ayande']);
             $table->string('token')->unique();
             $table->timestamps();
         });
